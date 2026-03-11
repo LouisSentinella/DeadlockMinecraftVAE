@@ -33,8 +33,8 @@ class Encoder(nn.Module):
             nn.LeakyReLU()
         )
 
-        self.fc_mu = nn.Linear(in_features=32768, out_features=z_dim)
-        self.fc_logvar = nn.Linear(in_features=32768, out_features=z_dim)
+        self.fc_mu = nn.Linear(in_features=2048, out_features=z_dim)
+        self.fc_logvar = nn.Linear(in_features=2048, out_features=z_dim)
 
     def forward(self, x):
         x = self.ConvBlock1(x)
@@ -49,7 +49,7 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, z_dim):
         super(Decoder, self).__init__()
-        self.fc = nn.Linear(in_features=z_dim, out_features=32768)
+        self.fc = nn.Linear(in_features=z_dim, out_features=2048)
         self.UpsampleBlock1 = nn.Sequential(
             nn.Upsample(scale_factor=2),
             nn.Conv2d(in_channels=512, out_channels=256, kernel_size=3, padding=1, stride=1),
@@ -82,7 +82,7 @@ class Decoder(nn.Module):
 
     def forward(self, x):
         x = self.fc(x)
-        x = x.view(-1, 512, 8, 8)
+        x = x.view(-1, 512, 2, 2)
         x = self.UpsampleBlock1(x)
         x = self.UpsampleBlock2(x)
         x = self.UpsampleBlock3(x)

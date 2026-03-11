@@ -1,9 +1,10 @@
 z_dim: 64
+alpha: 0.6
 beta: 0.001
 lr: 0.0001
-batch_size: 32
-epochs: 50
-image_size: 256
+batch_size: 64
+epochs: 100
+image_size: 64
 data:
   deadlock: ../data/processed/deadlock/
   minecraft: ../data/processed/minecraft/

@@ -15,6 +15,7 @@ from src.model import VAE
 with open('../config.yaml', 'r') as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
+ALPHA = config['alpha']
 Z_DIM = config['z_dim']
 BETA = config['beta']
 LR = config['lr']
@@ -40,7 +41,7 @@ def loss_function_perceptual(recon_x, x, mu, logvar, beta, perceptual_loss_modul
 
     kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()) / x.size(0)
 
-    total_recon_loss = p_loss + 0.1 * mse_loss
+    total_recon_loss = ALPHA * p_loss + (1 - ALPHA) * mse_loss
     total_loss = total_recon_loss + beta * kl_loss
 
     return total_loss, total_recon_loss, kl_loss
