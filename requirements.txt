@@ -1,0 +1,7 @@
+torch
+torchvision
+pillow
+pyyaml
+matplotlib
+umap-learn
+tqdm
