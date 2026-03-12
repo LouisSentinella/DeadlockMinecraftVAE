@@ -33,8 +33,8 @@ class Encoder(nn.Module):
             nn.LeakyReLU()
         )
 
-        self.fc_mu = nn.Linear(in_features=2048, out_features=z_dim)
-        self.fc_logvar = nn.Linear(in_features=2048, out_features=z_dim)
+        self.fc_mu = nn.Linear(in_features=32768, out_features=z_dim)
+        self.fc_logvar = nn.Linear(in_features=32768, out_features=z_dim)
 
     def forward(self, x):
         x = self.ConvBlock1(x)
@@ -49,29 +49,29 @@ class Encoder(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, z_dim):
         super(Decoder, self).__init__()
-        self.fc = nn.Linear(in_features=z_dim, out_features=2048)
+        self.fc = nn.Linear(in_features=z_dim, out_features=32768)
         self.UpsampleBlock1 = nn.Sequential(
             nn.Upsample(scale_factor=2),
             nn.Conv2d(in_channels=512, out_channels=256, kernel_size=3, padding=1, stride=1),
-            nn.BatchNorm2d(256),
+            nn.InstanceNorm2d(256),
             nn.ReLU(),
         )
         self.UpsampleBlock2 = nn.Sequential(
             nn.Upsample(scale_factor=2),
             nn.Conv2d(in_channels=256, out_channels=128, kernel_size=3, padding=1, stride=1),
-            nn.BatchNorm2d(128),
+            nn.InstanceNorm2d(128),
             nn.ReLU(),
         )
         self.UpsampleBlock3 = nn.Sequential(
             nn.Upsample(scale_factor=2),
             nn.Conv2d(in_channels=128, out_channels=64, kernel_size=3, padding=1, stride=1),
-            nn.BatchNorm2d(64),
+            nn.InstanceNorm2d(64),
             nn.ReLU(),
         )
         self.UpsampleBlock4 = nn.Sequential(
             nn.Upsample(scale_factor=2),
             nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, padding=1, stride=1),
-            nn.BatchNorm2d(32),
+            nn.InstanceNorm2d(32),
             nn.ReLU(),
         )
         self.UpsampleBlock5 = nn.Sequential(
@@ -82,7 +82,7 @@ class Decoder(nn.Module):
 
     def forward(self, x):
         x = self.fc(x)
-        x = x.view(-1, 512, 2, 2)
+        x = x.view(-1, 512, 8, 8)
         x = self.UpsampleBlock1(x)
         x = self.UpsampleBlock2(x)
         x = self.UpsampleBlock3(x)

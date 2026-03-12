@@ -12,7 +12,7 @@ class GameScreenshotsDataset(Dataset):
             for img in os.listdir(game):
                 self.data.append((os.path.join(game, img), i))
 
-        self.transform = transform or T.Compose([T.Resize((360,400)), T.CenterCrop((256, 256)), T.Resize(64), T.ToTensor(), T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])])
+        self.transform = transform or T.Compose([T.Resize((360,400)), T.CenterCrop((256, 256)), T.ToTensor(), T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])])
 
     def __len__(self):
         return len(self.data)

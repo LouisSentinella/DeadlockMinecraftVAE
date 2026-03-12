@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import yaml
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -19,6 +20,7 @@ ALPHA = config['alpha']
 Z_DIM = config['z_dim']
 BETA = config['beta']
 LR = config['lr']
+T_MAX = config['t_max']
 BATCH_SIZE = config['batch_size']
 EPOCHS = config['epochs']
 IMAGE_SIZE = config['image_size']
@@ -53,6 +55,7 @@ def train():
     model = VAE(Z_DIM).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=LR)
+    scheduler = CosineAnnealingLR(optimizer, T_max=T_MAX)
 
     perceptual_loss = PerceptualLoss().to(device)
 
@@ -88,7 +91,8 @@ def train():
         epoch_recon_loss /= len(dataloader)
         epoch_kl_loss /= len(dataloader)
         print(f"Epoch {epoch} | Loss: {epoch_loss:.4f} | Recon: {epoch_recon_loss:.4f} | KL: {epoch_kl_loss:.4f}")
-        if epoch % 1 == 0:
+        scheduler.step()
+        if epoch % 10 == 0:
             torch.save(model.state_dict(), f"../checkpoints/epoch_{epoch}.pt")
 
             model.eval()
