@@ -16,9 +16,10 @@ from src.model import VAE
 with open('../config.yaml', 'r') as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
-ALPHA = config['alpha']
+PERCEPTUAL_WEIGHT = config['perceptual_weight']
+KL_WEIGHT = config['kl_weight']
+CLASSIFIER_WEIGHT = config['classifier_weight']
 Z_DIM = config['z_dim']
-BETA = config['beta']
 LR = config['lr']
 T_MAX = config['t_max']
 BATCH_SIZE = config['batch_size']
@@ -36,13 +37,14 @@ def loss_function(recon_x, x, mu, logvar, beta):
     return recon_loss + beta * kl_loss, recon_loss, kl_loss
 
 
-def loss_function_perceptual(recon_x, x, mu, logvar, beta, perceptual_loss_module, class_logits, labels):
+def loss_function_perceptual(recon_x, x, mu, logvar, kl_weight, perceptual_loss_module, class_logits, labels):
     p_loss = perceptual_loss_module(recon_x, x)
 
     mse_loss = F.mse_loss(recon_x, x)
 
     kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()) / x.size(0)
 
+    # normalise weights
     p_mult = 1
     mse_mult = 200
 
@@ -50,8 +52,8 @@ def loss_function_perceptual(recon_x, x, mu, logvar, beta, perceptual_loss_modul
     mse_loss = mse_loss * mse_mult
     class_loss = F.cross_entropy(class_logits, labels.to(device), label_smoothing=0.2)
 
-    total_recon_loss = ALPHA * p_loss + (1 - ALPHA) * mse_loss
-    total_loss = total_recon_loss + beta * kl_loss + 0.5 * class_loss
+    total_recon_loss = PERCEPTUAL_WEIGHT * p_loss + (1 - PERCEPTUAL_WEIGHT) * mse_loss
+    total_loss = total_recon_loss + kl_weight * kl_loss + CLASSIFIER_WEIGHT * class_loss
 
     return total_loss, total_recon_loss, kl_loss, class_loss
 
@@ -89,7 +91,7 @@ def train():
 
             recon_x, mu, logvar, classifier_logits = model(batch.to(device))
 
-            loss, recon_loss, kl_loss, class_loss = loss_function_perceptual(recon_x, batch.to(device), mu, logvar, min(BETA, (epoch / 20) * BETA), perceptual_loss, classifier_logits, labels)
+            loss, recon_loss, kl_loss, class_loss = loss_function_perceptual(recon_x, batch.to(device), mu, logvar, min(KL_WEIGHT, (epoch / 20) * KL_WEIGHT), perceptual_loss, classifier_logits, labels)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
