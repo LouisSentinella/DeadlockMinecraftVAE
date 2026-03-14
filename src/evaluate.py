@@ -70,13 +70,13 @@ def interpolate(z1, z2, model, n):
     torchvision.utils.save_image(grid, f"../outputs/128mlpercep05mse10k/transfer_outs/interpolate.png")
 
 
-def style_transfer(image, source_centroid, target_centroid, model, n=10):
+def style_transfer(image, source_centroid, target_centroid, model, n=10, img_idx=0):
     mu, _ = model.Encoder(image.unsqueeze(0).to(device))
 
     residual = mu - source_centroid
 
     frames = []
-    for alpha in torch.linspace(0, 6, n):
+    for alpha in torch.linspace(0, 2, n):
         z = (1 - alpha) * source_centroid + alpha * target_centroid + residual
         decoded = model.Decoder(z)
         decoded = decoded.cpu() * 0.5 + 0.5
@@ -84,7 +84,7 @@ def style_transfer(image, source_centroid, target_centroid, model, n=10):
 
     comparison = torch.cat(frames, dim=0)
     grid = torchvision.utils.make_grid(comparison, nrow=n)
-    torchvision.utils.save_image(grid, f"../outputs/128mlpercep05mse10k/transfer_outs/style_transfer.png")
+    torchvision.utils.save_image(grid, f"../outputs/128mlpercep05mse10k/transfer_outs/style_transfer_{img_idx}.png")
 
 if __name__ == '__main__':
     dataset = GameScreenshotsDataset({"deadlock": DEADLOCK_DATA_PATH, "minecraft": MINECRAFT_DATA_PATH})
@@ -102,6 +102,9 @@ if __name__ == '__main__':
     deadlock_img, _ = dataset[random_idx]
     minecraft_img, _ = dataset[-random_idx]
 
-    interpolate(deadlock_img, minecraft_img, model, 8)
+    # interpolate(deadlock_img, minecraft_img, model, 8)
 
-    style_transfer(deadlock_img, deadlock_centroid, minecraft_centroid, model)
+    for i in range(5):
+        random_idx = random.randint(0, 8500)
+        minecraft_img, _ = dataset[-random_idx]
+        style_transfer(minecraft_img, minecraft_centroid, deadlock_centroid, model, img_idx=i)
