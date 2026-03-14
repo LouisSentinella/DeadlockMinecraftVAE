@@ -36,17 +36,24 @@ def loss_function(recon_x, x, mu, logvar, beta):
     return recon_loss + beta * kl_loss, recon_loss, kl_loss
 
 
-def loss_function_perceptual(recon_x, x, mu, logvar, beta, perceptual_loss_module):
+def loss_function_perceptual(recon_x, x, mu, logvar, beta, perceptual_loss_module, class_logits, labels):
     p_loss = perceptual_loss_module(recon_x, x)
 
     mse_loss = F.mse_loss(recon_x, x)
 
     kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()) / x.size(0)
 
-    total_recon_loss = ALPHA * p_loss + (1 - ALPHA) * mse_loss
-    total_loss = total_recon_loss + beta * kl_loss
+    p_mult = 1
+    mse_mult = 200
 
-    return total_loss, total_recon_loss, kl_loss
+    p_loss = p_loss * p_mult
+    mse_loss = mse_loss * mse_mult
+    class_loss = F.cross_entropy(class_logits, labels.to(device), label_smoothing=0.2)
+
+    total_recon_loss = ALPHA * p_loss + (1 - ALPHA) * mse_loss
+    total_loss = total_recon_loss + beta * kl_loss + 0.5 * class_loss
+
+    return total_loss, total_recon_loss, kl_loss, class_loss
 
 def train():
     dataset = GameScreenshotsDataset({"deadlock": DEADLOCK_DATA_PATH, "minecraft": MINECRAFT_DATA_PATH})
@@ -57,28 +64,40 @@ def train():
     optimizer = optim.Adam(model.parameters(), lr=LR)
     scheduler = CosineAnnealingLR(optimizer, T_max=T_MAX)
 
+    start_epoch = 0
+    if config.get('checkpoint'):
+        checkpoint = torch.load(config['checkpoint'])
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        start_epoch = checkpoint['epoch'] + 1
+        print(f"Resuming from epoch {start_epoch}")
+
     perceptual_loss = PerceptualLoss().to(device)
 
     loss_log = []
     fixed_batch, _ = next(iter(dataloader))
-    for epoch in range(EPOCHS):
+    for epoch in range(start_epoch, EPOCHS):
         epoch_recon_loss = 0
         epoch_kl_loss = 0
         epoch_loss = 0
+        epoch_class_loss = 0
 
         pbar = tqdm(dataloader, desc=f"Epoch {epoch}", leave=False)
         for batch, labels in pbar:
             optimizer.zero_grad()
 
-            recon_x, mu, logvar = model(batch.to(device))
+            recon_x, mu, logvar, classifier_logits = model(batch.to(device))
 
-            loss, recon_loss, kl_loss = loss_function_perceptual(recon_x, batch.to(device), mu, logvar, min(BETA, (epoch / 20) * BETA), perceptual_loss)
+            loss, recon_loss, kl_loss, class_loss = loss_function_perceptual(recon_x, batch.to(device), mu, logvar, min(BETA, (epoch / 20) * BETA), perceptual_loss, classifier_logits, labels)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
             pbar.set_postfix({
                 'loss': f"{loss.item():.4f}",
-                'kl': f"{kl_loss.item():.2f}"
+                'kl': f"{kl_loss.item():.2f}",
+                'recon_loss': f"{recon_loss.item():.4f}",
+                'class_loss': f"{class_loss.item():.4f}"
             })
 
             optimizer.step()
@@ -87,17 +106,25 @@ def train():
             epoch_loss += loss.item()
             epoch_recon_loss += recon_loss.item()
             epoch_kl_loss += kl_loss.item()
+            epoch_class_loss += class_loss.item()
         epoch_loss /= len(dataloader)
         epoch_recon_loss /= len(dataloader)
         epoch_kl_loss /= len(dataloader)
-        print(f"Epoch {epoch} | Loss: {epoch_loss:.4f} | Recon: {epoch_recon_loss:.4f} | KL: {epoch_kl_loss:.4f}")
+        epoch_class_loss /= len(dataloader)
+        print(f"Epoch {epoch} | Loss: {epoch_loss:.4f} | Recon: {epoch_recon_loss:.4f} | KL: {epoch_kl_loss:.4f} | Class Loss: {epoch_class_loss:.4f}")
         scheduler.step()
-        if epoch % 10 == 0:
-            torch.save(model.state_dict(), f"../checkpoints/epoch_{epoch}.pt")
+        if epoch % 5 == 0:
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'loss': epoch_loss,
+            }, f"../checkpoints/epoch_{epoch}.pt")
 
             model.eval()
             with torch.no_grad():
-                recon, _, _ = model(fixed_batch.to(device))
+                recon, _, _, _ = model(fixed_batch.to(device))
 
             originals = 0.5 * fixed_batch + 0.5
             reconstructions = 0.5 * recon.cpu() + 0.5
